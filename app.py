@@ -1,6 +1,6 @@
 from viktor import ViktorController
 from viktor.parametrization import ViktorParametrization, GeoPointField, TextField, Text, SetParamsButton, \
-    ViktorParametrization, Step, TextField, NumberField, SetParamsButton, ActionButton, DownloadButton, OutputField, OptionField
+    ViktorParametrization, Step, TextField, NumberField, SetParamsButton, ActionButton, DownloadButton, OutputField, OptionField, Tab, HiddenField
 from viktor.views import MapPolygon, MapView, MapResult, MapPoint, MapLine, Color
 from viktor.result import SetParamsResult, DownloadResult
 from viktor.errors import UserError
@@ -11,8 +11,11 @@ import pyproj
 import tempfile
 import zipfile
 from pathlib import Path
+import uuid
 
-data = []
+uuid_dir = str(uuid.uuid4())
+print(uuid_dir)
+# viktor-cli publish --registered-name pdok-app --tag v0.1.6.1
 
 def validate_step_1(params, **kwargs):
 
@@ -39,11 +42,11 @@ def coords(params, **kwargs):
     return f'{lat}, {lon}'
 
 class Parametrization(ViktorParametrization):
-    step_1 = Step('Step 1 - selecteer je locatie', views="get_map_view")
+    step_1 = Tab('Selecteer de locatie')
     step_1.introduction_text = Text(
         "## Welcome bij de PDOK app! \n"
-        "Met behulp van deze app kan je kaartlagen van de BGT en DKK downloaden in .dxf-formaat"
-        "Selecteer een gebied en bereik, klik op 'verder' om de download te starten"
+        "Met behulp van deze app kan je kaartlagen van de BGT en DKK downloaden in .dxf-formaat. "
+        "Selecteer een gebied en bereik, klik op 'verder' om de download te starten."
     )
 
     step_1.street = TextField("""Straatnaam""")
@@ -62,12 +65,30 @@ class Parametrization(ViktorParametrization):
     step_1.search_method = OptionField('Zoekmethode', options=['Ingevoerde adres', 'Pin-drop'], variant='radio-inline', flex=100)
     step_1.coordinaten = OutputField('Coordinaten locatie:', value=coords, flex=100)
 
-    step_2 = Step('Step 2 - with views', views='get_map_view_2')
-    step_2.reach_text = Text("### Download-bereik (m): \n")
+
+    step_2 = Tab('Download de bestanden')
+    step_2.step_2 = Text(
+        "## Welcome op de dowload-pagina! \n"
+        "Op deze pagina kan je de gewenste bestanden downloaden. "
+        "LET OP: momenteel kan je nog geen download-bereik instellen."
+    )
+
+    step_2.reach_text = Text("### Download-bereik: \n")
     step_2.download_range = NumberField('', variant='slider', min=100, max=2000, step=100, flex=100)
 
-    step_2.button = ActionButton('Download omgeving', method='perform_action')
-    step_2.download_btn = DownloadButton("Download file", "perform_download", longpoll=True)
+    step_2.download_range_text = Text(
+        "### Stap 1 \n"
+        "Klik eerst op 'Haal bestanden binnen'"
+        "Deze knop download de DKK- en BGT-kaarten van de gekozen locatie"
+    )
+    step_2.button = ActionButton('Haal bestanden binnen', method='perform_action', flex=100)
+
+    step_2.introduction_text = Text(
+        "### Stap 2 \n"
+        "Klik vervolgens op 'Converteer en download'"
+        "De knop bereid de download voor en zet de bestanden om naar DXF"
+    )
+    step_2.download_btn = DownloadButton("Converteer en download", "perform_download", longpoll=True, flex=100)
 
 
 class Controller(ViktorController):
@@ -94,12 +115,15 @@ class Controller(ViktorController):
             {'service': 'bgt', 'feature': 'wegdeel', 'layer': "bgt_wegdeel", 'color_rgb': (171, 187, 205),
              'color_aci': 252, "z_value": -30},
         ]
+        entity_folder_path = Path(__file__).parent  # entity_type_a
+        dir_path = entity_folder_path.parent / 'file_storage'
+        path = Path(dir_path, uuid_dir)
 
-        c = Converter(folder_name)
+        c = Converter(path)
         c.run_converter(export_list_data)
 
     def search_location(self, params, **kwargs):
-        address = f'{params.street} {params.number}, {params.city}, Netherlands'
+        address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
         geolocator = Nominatim(user_agent="my-app")
         location = geolocator.geocode(address)
         print(location.latitude)
@@ -107,9 +131,12 @@ class Controller(ViktorController):
         return location
 
     def perform_action(self, params, **kwargs):
-        address = f'{params.street} {params.number}, {params.city}, Netherlands'
-        print(address)
-        base = Pdok(params.street, params.number, params.city)
+        # address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
+        entity_folder_path = Path(__file__).parent  # entity_type_a
+        dir_path = entity_folder_path.parent / 'file_storage'
+        path = Path(dir_path, uuid_dir)
+
+        base = Pdok(params.step_1.street, params.step_1.number, params.step_1.city, path)
         base.run()
         print(base)
 
@@ -117,6 +144,7 @@ class Controller(ViktorController):
 
     def set_params(self, params, **kwargs):
         address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
+
         geolocator = Nominatim(user_agent="my-app")
         location = geolocator.geocode(address)
         lat = location.latitude
@@ -133,8 +161,9 @@ class Controller(ViktorController):
         # Prepare the path where files are located
         entity_folder_path = Path(__file__).parent  # entity_type_a
         dir_path = entity_folder_path.parent / 'file_storage'
-        path = Path(dir_path, f"{params.street} {params.number}, {params.city}, Netherlands")
+        path = Path(dir_path, f"{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands")
 
+        path = Path(dir_path, uuid_dir)
         self.run_dxf(f'{path}/')
 
         # Create a temporary file to store the zip archive
@@ -154,11 +183,13 @@ class Controller(ViktorController):
         return DownloadResult(zip_content, file_name="my_file.zip")
 
 
-    @MapView('Map view', duration_guess=1)
+    @MapView('PDOK kaart', duration_guess=1)
     def get_map_view(self, params, **kwargs):
         # Create points using the provided street, number, and city
         features = []
         print(params)
+
+
         if params.step_1.drag_location and params.step_1.search_method == 'Pin-drop':
             features.append(MapPoint.from_geo_point(params.step_1.drag_location))
 
@@ -187,17 +218,6 @@ class Controller(ViktorController):
         return MapResult(features)
 
 
-    @MapView('Map view 2', duration_guess=1)
-    def get_map_view_2(self, params, **kwargs):
-        features = []
-        print(f'params2 {params}')
-
-        a = [MapPoint(54.814614, -26.785331),
-        MapPoint(54.610949, -15.190123),
-        MapPoint(50.824269, -15.429211),
-        MapPoint(50.864828, -26.741683)]
-
-        return MapResult(features)
 
 if __name__ == "__main__":
     pass
