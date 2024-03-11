@@ -8,14 +8,17 @@ from parts.connector import Pdok
 from parts.converter import Converter
 from geopy.geocoders import Nominatim
 import pyproj
+import shutil
 import tempfile
 import zipfile
+from osgeo import ogr
+from osgeo import osr
 from pathlib import Path
 import uuid
 
-uuid_dir = str(uuid.uuid4())
-print(uuid_dir)
-# viktor-cli publish --registered-name pdok-app --tag v0.1.6.1
+
+# CURRENT VERSION
+# viktor-cli publish --registered-name pdok-app --tag v0.1.7.1
 
 def validate_step_1(params, **kwargs):
 
@@ -117,10 +120,29 @@ class Controller(ViktorController):
         ]
         entity_folder_path = Path(__file__).parent  # entity_type_a
         dir_path = entity_folder_path.parent / 'file_storage'
-        path = Path(dir_path, uuid_dir)
+        path = Path(dir_path)
 
-        c = Converter(path)
+        c = Converter(dir_path)
         c.run_converter(export_list_data)
+
+    # def run_dxf(self, folder_name):
+    #     export_list = [
+    #         {'layer': "dkk_pand", 'color': 254},
+    #         {'layer': "dkk_kadastralegrens", 'color': 251},
+    #         {'layer': "bgt_begroeidterreindeel", 'color': 253},
+    #         {'layer': "bgt_onbegroeidterreindeel", 'color': 83},
+    #         {'layer': "bgt_ondersteunendwaterdeel", 'color': 115},
+    #         {'layer': "bgt_ondersteunendwegdeel", 'color': 85},
+    #         {'layer': "bgt_ongeclassificeerdobject", 'color': 0},
+    #         # {'layer': "bgt_overigbouwwerk", 'color': 0},
+    #         # {'layer': "bgt_spoor", 'color': 0},
+    #         # {'layer': "bgt_tunneldeel", 'color': 0},
+    #         {'layer': "bgt_waterdeel", 'color': 153},
+    #         {'layer': "bgt_wegdeel", 'color': 252},
+    #     ]
+    #
+    #     gml = GmlConverter(folder_name)
+    #     gml.run_combined(export_list)
 
     def search_location(self, params, **kwargs):
         address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
@@ -134,9 +156,19 @@ class Controller(ViktorController):
         # address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
         entity_folder_path = Path(__file__).parent  # entity_type_a
         dir_path = entity_folder_path.parent / 'file_storage'
-        path = Path(dir_path, uuid_dir)
 
-        base = Pdok(params.step_1.street, params.step_1.number, params.step_1.city, path)
+        if dir_path.exists():
+            # Directory already exists, delete its contents
+            for item in dir_path.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        else:
+            # Directory does not exist, create it
+            dir_path.mkdir(parents=True)
+
+        base = Pdok(params.step_1.street, params.step_1.number, params.step_1.city, dir_path)
         base.run()
         print(base)
 
@@ -161,19 +193,19 @@ class Controller(ViktorController):
         # Prepare the path where files are located
         entity_folder_path = Path(__file__).parent  # entity_type_a
         dir_path = entity_folder_path.parent / 'file_storage'
-        path = Path(dir_path, f"{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands")
-
-        path = Path(dir_path, uuid_dir)
-        self.run_dxf(f'{path}/')
+        # path = Path(dir_path, f"{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands")
+        # path = Path(dir_path, uuid_dir)
+        self.run_dxf(f'{dir_path}/')
 
         # Create a temporary file to store the zip archive
         with tempfile.NamedTemporaryFile(delete=False) as tmp_zip:
             # Create a zip archive and add files to it
-            with zipfile.ZipFile(tmp_zip, 'w', zipfile.ZIP_DEFLATED) as z:
-                # Iterate over files in the directory and add them to the zip archive
-                for file_path in path.iterdir():
-                    file_name = file_path.name
-                    z.write(file_path, arcname=file_name)
+            with zipfile.ZipFile(tmp_zip.name, 'w', zipfile.ZIP_DEFLATED) as z:
+                # Iterate over files in the directory and add only files with extensions .dxf or .gml to the zip archive
+                for file_path in dir_path.iterdir():
+                    if file_path.is_file() and (file_path.suffix == '.dxf' or file_path.suffix == '.gml' or file_path.suffix == '.log'):
+                        file_name = file_path.name
+                        z.write(file_path, arcname=file_name)
 
         # Read the zip archive content
         with open(tmp_zip.name, 'rb') as f:

@@ -1,13 +1,17 @@
 import subprocess
 import os
 import ezdxf
+import logging
 from osgeo import ogr
 from osgeo import osr
+from parts import ogr2ogr
 
 class Converter:
     def __init__(self, file_path):
         self.file_path = os.path.expanduser(file_path)
-        print(self.file_path)
+        self.log_path = os.path.join(self.file_path, f'logfile.log')
+        logging.basicConfig(filename=self.log_path, level=logging.INFO)
+        logging.info('this is the log-file for any errors')
 
     def convert_to_shp(self, file_name):
         input_gml_path = os.path.join(self.file_path, f'{file_name}.gml')
@@ -15,20 +19,30 @@ class Converter:
         driver = ogr.GetDriverByName("ESRI Shapefile")
         out_ds = driver.CreateDataSource(output_shp_path)
         srs = osr.SpatialReference()
-        srs.ImportFromXML(open(input_gml_path, "r").read())
+        with open(input_gml_path, "r") as gml_file:
+            srs.ImportFromXML(gml_file.read())
         layer = out_ds.CreateLayer("output_layer", srs, ogr.wkbUnknown)
+
         src_ds = ogr.Open(input_gml_path)
         layer_source = src_ds.GetLayerByIndex(0)
-        for feature in layer_source:
-            new_feature = ogr.Feature(layer.GetLayerDefn())
-            new_feature.SetGeometry(feature.GetGeometryRef())
-            for i in range(feature.GetFieldCount()):
-                try:
-                    field_name = feature.GetFieldDefnRef(i).GetNameRef()
-                    new_feature.SetField(field_name, feature.GetField(i))
-                except Exception as e:
-                    print(f"Error setting field: {e}")
-            layer.CreateFeature(new_feature)
+
+        if layer_source is not None:
+            for feature in layer_source:
+                new_feature = ogr.Feature(layer.GetLayerDefn())
+                new_feature.SetGeometry(feature.GetGeometryRef())
+                for i in range(feature.GetFieldCount()):
+                    try:
+                        field_name = feature.GetFieldDefnRef(i).GetNameRef()
+                        field_value = feature.GetField(i)
+                        if isinstance(field_value, (int, float)):
+                            new_feature.SetField(field_name, field_value)
+                        else:
+                            new_feature.SetField(field_name, str(field_value))
+                    except Exception as e:
+                        # print(f"Error setting field: {e}")
+                        logging.exception("An error occurred: %s", e)
+
+                layer.CreateFeature(new_feature)
         out_ds = None
         src_ds = None
 
@@ -43,10 +57,12 @@ class Converter:
             input_shp_path,
             "-nln",
             layer_name,
-            "-oo",
-            f"LayerColor={color}",
+            # "-oo",
+            # f"LayerColor={color}",
         ]
-        subprocess.run(ogr2ogr_command)
+        # subprocess.run(ogr2ogr_command)
+        ogr2ogr.main(ogr2ogr_command)
+
         print("Shapefile successfully converted to DXF.")
 
     def combine_dxf(self, export_list):
@@ -82,14 +98,16 @@ class Converter:
     def run_converter(self, export_list_data):
         export_list_trimmed = []
         for i, export_item in enumerate(export_list_data):
-            try:
-                feature = export_item.get('feature')
-                name = export_item.get('layer')
-                color = export_item.get('color_aci')
-                self.convert_to_shp(name)
-                self.shp_to_dxf(name, layer_name=feature, color=color)
-                export_list_trimmed.append(export_item)
-            except Exception as e:
-                print(f"An error occurred during iteration {i}: {e}")
+            # try:
+            feature = export_item.get('feature')
+            name = export_item.get('layer')
+            color = export_item.get('color_aci')
+            self.convert_to_shp(name)
+            self.shp_to_dxf(name, layer_name=feature, color=color)
+            export_list_trimmed.append(export_item)
+            # except Exception as e:
+            #     print(f"An error occurred during iteration {i}: {e}")
+            #     logging.exception("An error occurred: %s", e)
+
         self.merge(export_list_trimmed)
         print("Conversion completed.")

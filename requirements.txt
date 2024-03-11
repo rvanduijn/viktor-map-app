@@ -2,7 +2,7 @@
 viktor==14.7.1
 GDAL-3.2.3-cp39-cp39-win_amd64.whl; platform_system == "Windows"
 GDAL-3.7.3-cp39-cp39-linux_x86_64.whl; platform_system == "Linux"
-pyproj
-requests
-ezdxf
-geopy
+pyproj~=3.6.1
+requests~=2.31.0
+ezdxf~=1.1.4
+geopy~=2.4.1
