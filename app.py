@@ -76,8 +76,8 @@ class Parametrization(ViktorParametrization):
         "LET OP: momenteel kan je nog geen download-bereik instellen."
     )
 
-    step_2.reach_text = Text("### Download-bereik: \n")
-    step_2.download_range = NumberField('', variant='slider', min=100, max=2000, step=100, flex=100)
+    # step_2.reach_text = Text("### Download-bereik: \n")
+    # step_2.download_range = NumberField('', variant='slider', min=100, max=2000, step=100, flex=100)
 
     step_2.download_range_text = Text(
         "### Stap 1 \n"
@@ -98,7 +98,7 @@ class Controller(ViktorController):
     label = "My Map Entity Type"
     parametrization = Parametrization
 
-    def run_dxf(self, folder_name):
+    def run_dxf(self, dir_path):
         export_list_data = [
             {'service': 'dkk', 'feature': 'pand', 'layer': "dkk_pand", 'color_rgb': (), 'color_aci': 254, "z_value": 0},
             {'service': 'dkk', 'feature': 'kadastralegrens', 'layer': "dkk_kadastralegrens", 'color_rgb': (),
@@ -118,9 +118,6 @@ class Controller(ViktorController):
             {'service': 'bgt', 'feature': 'wegdeel', 'layer': "bgt_wegdeel", 'color_rgb': (171, 187, 205),
              'color_aci': 252, "z_value": -30},
         ]
-        entity_folder_path = Path(__file__).parent  # entity_type_a
-        dir_path = entity_folder_path.parent / 'file_storage'
-        path = Path(dir_path)
 
         c = Converter(dir_path)
         c.run_converter(export_list_data)
@@ -195,7 +192,7 @@ class Controller(ViktorController):
         dir_path = entity_folder_path.parent / 'file_storage'
         # path = Path(dir_path, f"{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands")
         # path = Path(dir_path, uuid_dir)
-        self.run_dxf(f'{dir_path}/')
+        self.run_dxf(dir_path)
 
         # Create a temporary file to store the zip archive
         with tempfile.NamedTemporaryFile(delete=False) as tmp_zip:

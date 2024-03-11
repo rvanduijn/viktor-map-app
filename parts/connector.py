@@ -27,9 +27,8 @@ class Pdok:
         self.address = f'{self.street} {self.number}, {self.city}, {self.country}'
 
         entity_folder_path = Path(__file__).parent  # entity_type_a
-        self.dir_path = str(entity_folder_path.parent / 'file_storage')
+        # self.dir_path = str(entity_folder_path.parent / 'file_storage')
         self.dir_path = str(dir_path)
-        print(dir_path)
 
     def location_request(self, address):
 
