@@ -3,6 +3,7 @@ import os
 import ezdxf
 import logging
 from pathlib import Path
+import osgeo
 from osgeo import ogr
 from osgeo import osr
 from parts import ogr2ogr
@@ -21,8 +22,7 @@ class Converter:
     def convert_to_dxf(self, file_name, feature_name, color):
         input_gml_path = self.dir_og / f'{file_name}.gml'
         output_dxf_path = self.dir_og / f'{file_name}.dxf'
-        print(input_gml_path)
-        print(output_dxf_path)
+
         # Convert GML to DXF
         ogr2ogr_command = [
             "ogr2ogr",
@@ -35,15 +35,18 @@ class Converter:
             # "-oo",
             # f"LayerColor={color}",
         ]
-        try:
-            subprocess.run(ogr2ogr_command, check=True)
-            logging.info(f"Converted {file_name}.gml to {file_name}.dxf")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Error converting {file_name}.gml to DXF: {e}")
+        ogr2ogr.main(ogr2ogr_command)
+
+        # try:
+        #     subprocess.run(ogr2ogr_command, check=True)
+        #     logging.info(f"Converted {file_name}.gml to {file_name}.dxf")
+        # except subprocess.CalledProcessError as e:
+        #     logging.error(f"Error converting {file_name}.gml to DXF: {e}")
 
     def convert_to_shp(self, file_name):
         input_gml_path = os.path.join(self.dir_path, f'{file_name}.gml')
         output_shp_path = os.path.join(self.dir_path, f'{file_name}.shp')
+        print(osgeo.__version__)
         driver = ogr.GetDriverByName("ESRI Shapefile")
         out_ds = driver.CreateDataSource(output_shp_path)
         srs = osr.SpatialReference()

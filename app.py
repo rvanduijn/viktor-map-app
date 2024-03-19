@@ -14,11 +14,13 @@ import pyproj
 import shutil
 import tempfile
 import zipfile
+import osgeo
 from osgeo import ogr
 from osgeo import osr
 from pathlib import Path
 import uuid
 
+print(f'OSGEO VERSION --- {osgeo.__version__}')
 
 # CURRENT VERSION
 # viktor-cli publish --registered-name pdok-app --tag v0.1.7.1
@@ -148,8 +150,7 @@ class Controller(ViktorController):
         address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
         geolocator = Nominatim(user_agent="my-app")
         location = geolocator.geocode(address)
-        print(location.latitude)
-        print(location.longitude)
+
         return location
 
     def perform_action(self, params, **kwargs):
@@ -224,7 +225,8 @@ class Controller(ViktorController):
         # Create points using the provided street, number, and city
         features = []
         print(params)
-
+        print(f'OSGEO VERSION --- {osgeo.__version__}')
+        # print(ogr.__version__)
 
         if params.step_1.drag_location and params.step_1.search_method == 'Pin-drop':
             features.append(MapPoint.from_geo_point(params.step_1.drag_location))
