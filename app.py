@@ -15,8 +15,10 @@ import shutil
 import tempfile
 import zipfile
 import osgeo
+from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
+
 from pathlib import Path
 import uuid
 

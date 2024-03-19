@@ -4,6 +4,7 @@ import ezdxf
 import logging
 from pathlib import Path
 import osgeo
+from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
 from parts import ogr2ogr
@@ -43,61 +44,61 @@ class Converter:
         # except subprocess.CalledProcessError as e:
         #     logging.error(f"Error converting {file_name}.gml to DXF: {e}")
 
-    def convert_to_shp(self, file_name):
-        input_gml_path = os.path.join(self.dir_path, f'{file_name}.gml')
-        output_shp_path = os.path.join(self.dir_path, f'{file_name}.shp')
-        print(osgeo.__version__)
-        driver = ogr.GetDriverByName("ESRI Shapefile")
-        out_ds = driver.CreateDataSource(output_shp_path)
-        srs = osr.SpatialReference()
-        with open(input_gml_path, "r") as gml_file:
-            srs.ImportFromXML(gml_file.read())
-        layer = out_ds.CreateLayer("output_layer", srs, ogr.wkbUnknown)
-
-        src_ds = ogr.Open(input_gml_path)
-        layer_source = src_ds.GetLayerByIndex(0)
-
-        if layer_source is not None:
-            for feature in layer_source:
-                new_feature = ogr.Feature(layer.GetLayerDefn())
-                new_feature.SetGeometry(feature.GetGeometryRef())
-                for i in range(feature.GetFieldCount()):
-                    try:
-                        field_name = feature.GetFieldDefnRef(i).GetNameRef()
-                        field_value = feature.GetField(i)
-                        if isinstance(field_value, (int, float)):
-                            new_feature.SetField(field_name, field_value)
-                        else:
-                            new_feature.SetField(field_name, str(field_value))
-                    except Exception as e:
-                        # print(f"Error setting field: {e}")
-                        logging.exception("An error occurred: %s", e)
-
-                layer.CreateFeature(new_feature)
-        out_ds = None
-        src_ds = None
-
-    def shp_to_dxf(self, file_name, layer_name, color):
-        # input_shp_path = os.path.join(self.dir_path, f'{file_name}.shp')
-        # output_dxf_path = os.path.join(self.dir_path, f'{file_name}.dxf')
-        input_shp_path = self.dir_path / f'{file_name}.dxf'
-        output_dxf_path = self.dir_path / f'{file_name}.dxf'
-
-        ogr2ogr_command = [
-            "ogr2ogr",
-            "-f",
-            "DXF",
-            output_dxf_path,
-            input_shp_path,
-            "-nln",
-            layer_name,
-            # "-oo",
-            # f"LayerColor={color}",
-        ]
-        # subprocess.run(ogr2ogr_command)
-        ogr2ogr.main(ogr2ogr_command)
-
-        print("Shapefile successfully converted to DXF.")
+    # def convert_to_shp(self, file_name):
+    #     input_gml_path = os.path.join(self.dir_path, f'{file_name}.gml')
+    #     output_shp_path = os.path.join(self.dir_path, f'{file_name}.shp')
+    #     print(osgeo.__version__)
+    #     driver = ogr.GetDriverByName("ESRI Shapefile")
+    #     out_ds = driver.CreateDataSource(output_shp_path)
+    #     srs = osr.SpatialReference()
+    #     with open(input_gml_path, "r") as gml_file:
+    #         srs.ImportFromXML(gml_file.read())
+    #     layer = out_ds.CreateLayer("output_layer", srs, ogr.wkbUnknown)
+    #
+    #     src_ds = ogr.Open(input_gml_path)
+    #     layer_source = src_ds.GetLayerByIndex(0)
+    #
+    #     if layer_source is not None:
+    #         for feature in layer_source:
+    #             new_feature = ogr.Feature(layer.GetLayerDefn())
+    #             new_feature.SetGeometry(feature.GetGeometryRef())
+    #             for i in range(feature.GetFieldCount()):
+    #                 try:
+    #                     field_name = feature.GetFieldDefnRef(i).GetNameRef()
+    #                     field_value = feature.GetField(i)
+    #                     if isinstance(field_value, (int, float)):
+    #                         new_feature.SetField(field_name, field_value)
+    #                     else:
+    #                         new_feature.SetField(field_name, str(field_value))
+    #                 except Exception as e:
+    #                     # print(f"Error setting field: {e}")
+    #                     logging.exception("An error occurred: %s", e)
+    #
+    #             layer.CreateFeature(new_feature)
+    #     out_ds = None
+    #     src_ds = None
+    #
+    # def shp_to_dxf(self, file_name, layer_name, color):
+    #     # input_shp_path = os.path.join(self.dir_path, f'{file_name}.shp')
+    #     # output_dxf_path = os.path.join(self.dir_path, f'{file_name}.dxf')
+    #     input_shp_path = self.dir_path / f'{file_name}.dxf'
+    #     output_dxf_path = self.dir_path / f'{file_name}.dxf'
+    #
+    #     ogr2ogr_command = [
+    #         "ogr2ogr",
+    #         "-f",
+    #         "DXF",
+    #         output_dxf_path,
+    #         input_shp_path,
+    #         "-nln",
+    #         layer_name,
+    #         # "-oo",
+    #         # f"LayerColor={color}",
+    #     ]
+    #     # subprocess.run(ogr2ogr_command)
+    #     ogr2ogr.main(ogr2ogr_command)
+    #
+    #     print("Shapefile successfully converted to DXF.")
 
     # def merge(self):
     #     target_dxf = ezdxf.new("R2010")
