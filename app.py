@@ -208,7 +208,7 @@ class Controller(ViktorController):
             with zipfile.ZipFile(tmp_zip.name, 'w', zipfile.ZIP_DEFLATED) as z:
                 # Iterate over files in the directory and add only files with extensions .dxf or .gml to the zip archive
                 for file_path in dir_path.iterdir():
-                    if file_path.is_file() and (file_path.suffix == '.dxf' or file_path.suffix == '.gml' or file_path.suffix == '.log'):
+                    if file_path.is_file() and (file_path.suffix == '.dxf' or file_path.suffix == '.gml' or file_path.suffix == '.shp'):
                         file_name = file_path.name
                         z.write(file_path, arcname=file_name)
 
