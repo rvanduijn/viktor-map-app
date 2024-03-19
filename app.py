@@ -1,3 +1,5 @@
+import os.path
+
 from viktor import ViktorController
 from viktor.parametrization import ViktorParametrization, GeoPointField, TextField, Text, SetParamsButton, \
     ViktorParametrization, Step, TextField, NumberField, SetParamsButton, ActionButton, DownloadButton, OutputField, OptionField, Tab, HiddenField
@@ -7,6 +9,7 @@ from viktor.errors import UserError
 from parts.connector import Pdok
 from parts.converter import Converter
 from geopy.geocoders import Nominatim
+import logging
 import pyproj
 import shutil
 import tempfile
@@ -98,7 +101,7 @@ class Controller(ViktorController):
     label = "My Map Entity Type"
     parametrization = Parametrization
 
-    def run_dxf(self, dir_path):
+    def run_dxf(self, dir_folder, abs_dir_path):
         export_list_data = [
             {'service': 'dkk', 'feature': 'pand', 'layer': "dkk_pand", 'color_rgb': (), 'color_aci': 254, "z_value": 0},
             {'service': 'dkk', 'feature': 'kadastralegrens', 'layer': "dkk_kadastralegrens", 'color_rgb': (),
@@ -119,7 +122,7 @@ class Controller(ViktorController):
              'color_aci': 252, "z_value": -30},
         ]
 
-        c = Converter(dir_path)
+        c = Converter(dir_folder, abs_dir_path)
         c.run_converter(export_list_data)
 
     # def run_dxf(self, folder_name):
@@ -152,7 +155,7 @@ class Controller(ViktorController):
     def perform_action(self, params, **kwargs):
         # address = f'{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands'
         entity_folder_path = Path(__file__).parent  # entity_type_a
-        dir_path = entity_folder_path.parent / 'file_storage'
+        dir_path = entity_folder_path / 'file_storage'
 
         if dir_path.exists():
             # Directory already exists, delete its contents
@@ -164,6 +167,9 @@ class Controller(ViktorController):
         else:
             # Directory does not exist, create it
             dir_path.mkdir(parents=True)
+
+        log_path = dir_path / "logfile.log"
+        logging.basicConfig(filename=log_path, level=logging.INFO)
 
         base = Pdok(params.step_1.street, params.step_1.number, params.step_1.city, dir_path)
         base.run()
@@ -189,10 +195,11 @@ class Controller(ViktorController):
     def perform_download(self, params, **kwargs):
         # Prepare the path where files are located
         entity_folder_path = Path(__file__).parent  # entity_type_a
-        dir_path = entity_folder_path.parent / 'file_storage'
+        dir_path = entity_folder_path / 'file_storage'
+        abs_dir_path = os.path.abspath(dir_path)
         # path = Path(dir_path, f"{params.step_1.street} {params.step_1.number}, {params.step_1.city}, Netherlands")
         # path = Path(dir_path, uuid_dir)
-        self.run_dxf(dir_path)
+        self.run_dxf(dir_path, abs_dir_path)
 
         # Create a temporary file to store the zip archive
         with tempfile.NamedTemporaryFile(delete=False) as tmp_zip:
