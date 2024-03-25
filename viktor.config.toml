@@ -3,6 +3,6 @@
 
 app_type = 'editor'
 # assets_path = 'assets'
-packages = ["ogr2ogr"]
+packages = ["gdal-bin"]
 python_version = '3.9'  # '3.9' | '3.10' | '3.11' | '3.12'
 # welcome_text = 'welcome.md'
