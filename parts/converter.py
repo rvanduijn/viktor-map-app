@@ -7,7 +7,7 @@ import osgeo
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
-from parts import ogr2ogr
+# from parts import ogr2ogr
 
 class Converter:
     def __init__(self, dir_path, abs_dir_path):
@@ -36,13 +36,13 @@ class Converter:
             # "-oo",
             # f"LayerColor={color}",
         ]
-        ogr2ogr.main(ogr2ogr_command)
+        # ogr2ogr.main(ogr2ogr_command)
 
-        # try:
-        #     subprocess.run(ogr2ogr_command, check=True)
-        #     logging.info(f"Converted {file_name}.gml to {file_name}.dxf")
-        # except subprocess.CalledProcessError as e:
-        #     logging.error(f"Error converting {file_name}.gml to DXF: {e}")
+        try:
+            subprocess.run(ogr2ogr_command, check=True)
+            logging.info(f"Converted {file_name}.gml to {file_name}.dxf")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error converting {file_name}.gml to DXF: {e}")
 
     # def convert_to_shp(self, file_name):
     #     input_gml_path = os.path.join(self.dir_path, f'{file_name}.gml')
