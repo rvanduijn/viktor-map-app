@@ -7,7 +7,7 @@ import osgeo
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
-# from parts import ogr2ogr
+from parts import ogr2ogr
 
 class Converter:
     def __init__(self, dir_path, abs_dir_path):
