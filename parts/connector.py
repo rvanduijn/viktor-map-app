@@ -19,15 +19,15 @@ import ezdxf
 
 
 class Pdok:
-    def __init__(self, street, number, city):
+    def __init__(self, street, number, city, dir_path):
         self.street = street
         self.number = number
         self.city = city
         self.country = "Netherlands"
         self.address = f'{self.street} {self.number}, {self.city}, {self.country}'
 
-        entity_folder_path = Path(__file__).parent  # entity_type_a
-        self.dir_path = str(entity_folder_path.parent / 'file_storage')
+
+        self.dir_path = str(dir_path)
 
     def location_request(self, address):
 
@@ -143,14 +143,15 @@ class Pdok:
 
             # home_dir = os.path.expanduser('~')
             # downloads_dir = os.path.join(home_dir, 'Downloads')
-            extract_path = '/'.join([self.dir_path, self.address])
 
+            # extract_path = '/'.join([self.dir_path, self.address])
+            # print(extract_path)
 
 
             with zipfile.ZipFile(file_name, "r") as zip_ref:
-                zip_ref.extractall(extract_path)
+                zip_ref.extractall(self.dir_path)
 
-            self.rename_file_extension(extract_path, '.xml', '.gml')
+            self.rename_file_extension(self.dir_path, '.xml', '.gml')
 
     def iterate(self, req_url):
 
