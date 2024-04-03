@@ -19,14 +19,14 @@ import ezdxf
 
 
 class Pdok:
-    def __init__(self, street, number, city, dir_path):
-        self.street = street
-        self.number = number
-        self.city = city
-        self.country = "Netherlands"
-        self.address = f'{self.street} {self.number}, {self.city}, {self.country}'
+    def __init__(self, lon, lat, dir_path):
+        # self.street = street
+        # self.number = number
+        # self.city = city
+        # self.country = "Netherlands"
+        # self.address = f'{self.street} {self.number}, {self.city}, {self.country}'
 
-
+        self.rd_coord = [lon, lat]
         self.dir_path = str(dir_path)
 
     def location_request(self, address):
@@ -184,8 +184,8 @@ class Pdok:
 
     def run(self, size=1000):
 
-        rd_coord = self.location_request(self.address)
-        poly_range = self.download_range(rd_coord, size)
+        # rd_coord = self.location_request(self.address)
+        poly_range = self.download_range(self.rd_coord, size)
 
         sett_bgt = self.settings_bgt(poly_range)
         sett_dkk = self.settings_dkk(poly_range)
