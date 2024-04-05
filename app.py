@@ -25,7 +25,7 @@ import uuid
 # print(f'OSGEO VERSION --- {osgeo.__version__}')
 
 # CURRENT VERSION
-# viktor-cli publish --registered-name pdok-app --tag v0.1.7.5
+# viktor-cli publish --registered-name pdok-app --tag v0.1.7.8
 
 def validate_step_1(params, **kwargs):
 
@@ -74,10 +74,10 @@ class Parametrization(ViktorParametrization):
     drag_location = GeoPointField('Klik op de pin en sleep deze op de kaart om een  locatie te selecteren:')
     # zoek_pin = SetParamsButton("Zoek locatie met pin", "", flex=100)
 
-
-
-    # reach_text = Text("### Download-bereik: \n")
     # download_range = NumberField('', variant='slider', min=100, max=2000, step=100, flex=100)
+    download_range = OptionField('#### Straal rondom locatie:', options=[250, 500, 1000], default=500)
+
+
 
     download_range_text = Text(
         "### Download de bestanden \n"
@@ -194,7 +194,7 @@ class Controller(ViktorController):
             lon = None
             lat = None
 
-        range_meters = 1000
+        range_meters = params.download_range
         self.download_files(dir_path, lon, lat, range_meters)
         self.run_dxf(dir_path, abs_dir_path)
         zip_content = self.filter_and_zip(dir_path)

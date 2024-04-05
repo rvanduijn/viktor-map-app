@@ -74,12 +74,12 @@ class Pdok:
                 "onbegroeidterreindeel",
                 "ondersteunendwaterdeel",
                 "ondersteunendwegdeel",
-                "ongeclassificeerdobject",
+                # "ongeclassificeerdobject",
                 "overbruggingsdeel",
-                "overigbouwwerk",
+                # "overigbouwwerk",
                 "spoor",
                 "tunneldeel",
-                "vegetatieobject",
+                # "vegetatieobject",
                 "waterdeel",
                 "wegdeel"
             ],
@@ -96,7 +96,7 @@ class Pdok:
         data = {
             "featuretypes": [
                 "kadastralegrens",
-                "pand"
+                # "pand"
             ],
             "format": "gml",
             "geofilter": poly_range
@@ -182,7 +182,7 @@ class Pdok:
 
         return response_list
 
-    def run(self, size=1000):
+    def run(self, size):
 
         # rd_coord = self.location_request(self.address)
         poly_range = self.download_range(self.rd_coord, size)
