@@ -124,8 +124,15 @@ class Pdok:
         data = sett_dkk.get('data')
 
         response_filter = requests.post(url, headers=headers, json=data)
+        print(f'Response status code: {response_filter.status_code}')
+        print(f'Response text: {response_filter.text}')
+        try:
+            print(f'response {response_filter.json()}')
+        except requests.exceptions.JSONDecodeError:
+            print("Failed to parse the response as JSON.")
         request_id = response_filter.json().get('downloadRequestId')
-        request_id_url = f'https://api.pdok.nl/kadaster/kadastralekaart/download/v4_0/delta/custom/{request_id}/status'
+        print(f'request id {request_id}')
+        request_id_url = f'https://api.pdok.nl/kadaster/kadastralekaart/download/v5_0/delta/custom/{request_id}/status'
 
         return request_id_url
 
@@ -183,17 +190,16 @@ class Pdok:
         return response_list
 
     def run(self, size):
-
         # rd_coord = self.location_request(self.address)
         poly_range = self.download_range(self.rd_coord, size)
 
         sett_bgt = self.settings_bgt(poly_range)
-        sett_dkk = self.settings_dkk(poly_range)
+        # sett_dkk = self.settings_dkk(poly_range)
 
         req_bgt = self.bgt_request(sett_bgt)
-        req_dkk = self.dkk_request(sett_dkk)
+        # req_dkk = self.dkk_request(sett_dkk)
 
         resp_bgt = self.iterate(req_bgt)
-        resp_dkk = self.iterate(req_dkk)
+        # resp_dkk = self.iterate(req_dkk)
 
         return resp_bgt

@@ -25,7 +25,7 @@ import uuid
 # print(f'OSGEO VERSION --- {osgeo.__version__}')
 
 # CURRENT VERSION
-# viktor-cli publish --registered-name pdok-app --tag v0.1.7.8
+# viktor-cli publish --registered-name pdok-app --tag v0.1.7.9
 
 def validate_step_1(params, **kwargs):
 
