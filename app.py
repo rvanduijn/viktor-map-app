@@ -6,7 +6,7 @@ from viktor.parametrization import ViktorParametrization, GeoPointField, TextFie
 from viktor.views import MapPolygon, MapView, MapResult, MapPoint, MapLine, Color
 from viktor.result import SetParamsResult, DownloadResult
 from viktor.errors import UserError
-from parts.connector import Pdok
+from parts.connector_v2 import Pdok
 from parts.converter import Converter
 from geopy.geocoders import Nominatim
 import logging
@@ -25,7 +25,7 @@ import uuid
 # print(f'OSGEO VERSION --- {osgeo.__version__}')
 
 # CURRENT VERSION
-# viktor-cli publish --registered-name pdok-app --tag v0.1.7.9
+# viktor-cli publish --registered-name pdok-app --tag v0.1.8
 
 def validate_step_1(params, **kwargs):
 
@@ -159,7 +159,7 @@ class Controller(ViktorController):
             with zipfile.ZipFile(tmp_zip.name, 'w', zipfile.ZIP_DEFLATED) as z:
                 # Iterate over files in the directory and add only files with extensions .dxf or .gml to the zip archive
                 for file_path in dir_path.iterdir():
-                    if file_path.is_file() and (file_path.suffix == '.dxf' or file_path.suffix == '.gml' or file_path.suffix == '.shp'):
+                    if file_path.is_file():# and (file_path.suffix == '.dxf' or file_path.suffix == '.gml' or file_path.suffix == '.shp'):
                         file_name = file_path.name
                         z.write(file_path, arcname=file_name)
 

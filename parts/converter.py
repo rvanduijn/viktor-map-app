@@ -61,6 +61,11 @@ class Converter:
 
         combined_path = self.dir_og / "PDOK_combined.dxf"
         target_dxf.saveas(str(combined_path))
+
+        # Add a comment with the CRS information
+        with open(combined_path, 'a') as f:
+            f.write(f'\n0\nCOMMENT\n1\nCRS=EPSG:28992\n')
+
         logging.info(f"Combined DXF files saved as {combined_path}")
 
     def run_converter(self, export_list_data):

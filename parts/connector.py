@@ -91,7 +91,7 @@ class Pdok:
         return settings
 
     def settings_dkk(self, poly_range):
-        url = 'https://api.pdok.nl/kadaster/kadastralekaart/download/v4_0/full/custom'
+        url = 'https://api.pdok.nl/kadaster/kadastralekaart/download/v5_0/full/custom'
         headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
         data = {
             "featuretypes": [
@@ -194,12 +194,12 @@ class Pdok:
         poly_range = self.download_range(self.rd_coord, size)
 
         sett_bgt = self.settings_bgt(poly_range)
-        # sett_dkk = self.settings_dkk(poly_range)
+        sett_dkk = self.settings_dkk(poly_range)
 
         req_bgt = self.bgt_request(sett_bgt)
-        # req_dkk = self.dkk_request(sett_dkk)
+        req_dkk = self.dkk_request(sett_dkk)
 
         resp_bgt = self.iterate(req_bgt)
-        # resp_dkk = self.iterate(req_dkk)
+        resp_dkk = self.iterate(req_dkk)
 
         return resp_bgt
