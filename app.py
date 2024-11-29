@@ -1,20 +1,22 @@
 import os.path
-
-from viktor import ViktorController
+from viktor import ViktorController, progress_message
 from viktor.parametrization import ViktorParametrization, GeoPointField, TextField, Text, SetParamsButton, \
     ViktorParametrization, Step, TextField, NumberField, SetParamsButton, ActionButton, DownloadButton, OutputField, OptionField, Tab, HiddenField
 from viktor.views import MapPolygon, MapView, MapResult, MapPoint, MapLine, Color
 from viktor.result import SetParamsResult, DownloadResult
 from viktor.errors import UserError
-from parts.connector_v2 import Pdok
+from parts.connector import Pdok
 from parts.converter import Converter
+from parts.ruimtelijke_plannen import Omgevingsloket
 from geopy.geocoders import Nominatim
+from viktor.errors import UserError, InputViolation
 import logging
 import pyproj
 import shutil
 import tempfile
 import zipfile
 import osgeo
+import time
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
@@ -25,7 +27,8 @@ import uuid
 # print(f'OSGEO VERSION --- {osgeo.__version__}')
 
 # CURRENT VERSION
-# viktor-cli publish --registered-name pdok-app --tag v0.1.8
+# viktor-cli publish --registered-name pdok-app --tag v1.1
+
 
 def validate_step_1(params, **kwargs):
 
@@ -105,16 +108,22 @@ class Controller(ViktorController):
             dir_path.mkdir(parents=True)
 
         log_path = dir_path / "logfile.log"
-        logging.basicConfig(filename=log_path, level=logging.INFO)
+        logging.basicConfig(filename=log_path, level=logging.CRITICAL)
 
         base = Pdok(lon, lat,  dir_path)
         base.run(size=range_meters)
+
+    def omgevingsloket(self, dir_path, lat, lon):
+        olo = Omgevingsloket(dir_path, lat, lon)
+        olo.run()
+
+
 
 
     def run_dxf(self, dir_folder, abs_dir_path):
         export_list_data = [
             {'service': 'dkk', 'feature': 'pand', 'layer': "dkk_pand", 'color_rgb': (), 'color_aci': 254, "z_value": 0},
-            {'service': 'dkk', 'feature': 'kadastralegrens', 'layer': "dkk_kadastralegrens", 'color_rgb': (),
+            {'service': 'dkk', 'feature': 'kadastralegrens', 'layer': "kadastralekaart_kadastralegrens", 'color_rgb': (),
              'color_aci': 251, "z_value": -10},
             {'service': 'bgt', 'feature': 'begroeidterreindeel', 'layer': "bgt_begroeidterreindeel", 'color_rgb': (),
              'color_aci': 253, "z_value": -50},
@@ -130,6 +139,27 @@ class Controller(ViktorController):
              'color_aci': 153, "z_value": -70},
             {'service': 'bgt', 'feature': 'wegdeel', 'layer': "bgt_wegdeel", 'color_rgb': (171, 187, 205),
              'color_aci': 252, "z_value": -30},
+        ]
+
+        export_list_data = [
+            {'service': 'dkk', 'feature': 'pand', 'layer': "dkk_pand", 'color_aci': 254, 'z_value': 0,
+             'rgb_edge': (120, 120, 120)},
+            {'service': 'dkk', 'feature': 'kadastralegrens', 'layer': "kadastralekaart_kadastralegrens",
+             'color_aci': 251, 'z_value': -10, 'rgb_edge': (255, 255, 255)},
+            {'service': 'bgt', 'feature': 'begroeidterreindeel', 'layer': "bgt_begroeidterreindeel", 'color_aci': 253,
+             'z_value': -50, 'rgb_face': (202, 214, 186), 'rgb_edge': (148, 173, 143)},
+            {'service': 'bgt', 'feature': 'onbegroeidterreindeel', 'layer': "bgt_onbegroeidterreindeel",
+             'color_aci': 83, 'z_value': -40, 'rgb_face': (230, 230, 230), 'rgb_edge': (140, 140, 140)},
+            {'service': 'bgt', 'feature': 'ondersteunendwaterdeel', 'layer': "bgt_ondersteunendwaterdeel",
+             'color_aci': 115, 'z_value': -60, 'rgb_face': (189, 205, 167), 'rgb_edge': (148, 173, 143)},
+            {'service': 'bgt', 'feature': 'ondersteunendwegdeel', 'layer': "bgt_ondersteunendwegdeel", 'color_aci': 85,
+             'z_value': -20, 'rgb_face': (180, 180, 180), 'rgb_edge': (120, 120, 120)},
+            {'service': 'bgt', 'feature': 'ongeclassificeerdobject', 'layer': "bgt_ongeclassificeerdobject",
+             'color_aci': 0, 'z_value': -5},
+            {'service': 'bgt', 'feature': 'waterdeel', 'layer': "bgt_waterdeel", 'color_aci': 153, 'z_value': -70,
+             'rgb_face': (191, 204, 215), 'rgb_edge': (128, 149, 174)},
+            {'service': 'bgt', 'feature': 'wegdeel', 'layer': "bgt_wegdeel", 'color_aci': 252, 'z_value': -30,
+             'rgb_face': (210, 210, 210), 'rgb_edge': (180, 180, 180)},
         ]
 
         c = Converter(dir_folder, abs_dir_path)
@@ -170,9 +200,13 @@ class Controller(ViktorController):
         return zip_content
 
     def perform_download(self, params, **kwargs):
+        progress_message(message=f'Het downloaden kan enkele minuten duren.')
         entity_folder_path = Path(__file__).parent  # entity_type_a
         dir_path = entity_folder_path / 'file_storage'
         abs_dir_path = os.path.abspath(dir_path)
+
+        if params.search_method == None:
+            raise UserError("Er is geen zoekmethode gekozen")
 
         if params.drag_location and params.search_method == 'Pin-drop':
             print(params.drag_location)
@@ -196,6 +230,11 @@ class Controller(ViktorController):
 
         range_meters = params.download_range
         self.download_files(dir_path, lon, lat, range_meters)
+        gps_lat = params.drag_location.lat
+        gps_lon = params.drag_location.lon
+        print(f'GPS LAT --- {gps_lat} --- GPS LON --- {gps_lon}')
+        self.omgevingsloket(dir_path, gps_lat, gps_lon)
+
         self.run_dxf(dir_path, abs_dir_path)
         zip_content = self.filter_and_zip(dir_path)
 
@@ -216,12 +255,13 @@ class Controller(ViktorController):
             print(params.drag_location.lat)
 
         if params.street and params.number and params.city:
+            time.sleep(5)
             address = f'{params.street} {params.number}, {params.city}, Netherlands'
             geolocator = Nominatim(user_agent="my-app")
             location = geolocator.geocode(address)
             lat = location.latitude
             lon = location.longitude
-
+            print(location)
             if params.search_method == 'Ingevoerde adres':
                 features.append(MapPoint(lat, lon))
                 params.data = [lat, lon]
