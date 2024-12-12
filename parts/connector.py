@@ -1,199 +1,168 @@
-from pathlib import Path
-from geopy.geocoders import Nominatim
-import sys
-import subprocess
-from viktor.core import Storage
-import shutil
-import pyproj
-import requests
+import os
 import time
 import tempfile
-from os import listdir
 import zipfile
-from os.path import isfile, join
-from pathlib import Path
-
-import xml.etree.ElementTree as ET
-import os
-import ezdxf
+import requests
+import pyproj
+from geopy.geocoders import Nominatim
+from PIL import Image
+from io import BytesIO
 
 
 class Pdok:
-    def __init__(self, street, number, city, dir_path):
-        self.street = street
-        self.number = number
-        self.city = city
-        self.country = "Netherlands"
-        self.address = f'{self.street} {self.number}, {self.city}, {self.country}'
-
-
+    def __init__(self, lon, lat, dir_path):
+        self.rd_coord = [lon, lat]
         self.dir_path = str(dir_path)
 
-    def location_request(self, address):
-
+    def _geocode_address(self, address):
         geolocator = Nominatim(user_agent="my-app")
         location = geolocator.geocode(address)
         wgs84 = pyproj.CRS('EPSG:4326')
         rd = pyproj.CRS('EPSG:28992')
         transformer = pyproj.Transformer.from_crs(wgs84, rd)
         rd_coord = transformer.transform(location.latitude, location.longitude)
-
         return rd_coord
 
-    def download_range(self, coord, range):
-
+    def _create_polygon_range(self, coord, range):
         x, y = coord
         rad = int(range / 2)
+        x1, x2 = x - rad, x + rad
+        y1, y2 = y - rad, y + rad
+        return f"POLYGON(({x1} {y1},{x2} {y1},{x2} {y2},{x2} {y1},{x1} {y1}))"
 
-        x1 = x - rad
-        x2 = x + rad
-        y1 = y - rad
-        y2 = y + rad
-
-        range_str = f"POLYGON(({x1} {y1},{x2} {y1},{x2} {y2},{x2} {y1},{x1} {y1}))"
-        print(range_str)
-
-        return range_str
-
-    def rename_file_extension(self, directory, old_extension, new_extension):
-        # Loop through all files in the directory
+    def _rename_file_extension(self, directory, old_extension, new_extension):
         for filename in os.listdir(directory):
-            # Check if the file has the old extension
             if filename.endswith(old_extension):
-                # Rename the file with the new extension
                 new_filename = os.path.splitext(filename)[0] + new_extension
                 os.rename(os.path.join(directory, filename), os.path.join(directory, new_filename))
 
-    def settings_bgt(self, poly_range):
+    def _prepare_request_settings(self, poly_range, bgt=True):
+        base_urls = {
+            'bgt': 'https://api.pdok.nl/lv/bgt/download/v1_0/delta/custom',
+            'dkk': 'https://api.pdok.nl/kadaster/kadastralekaart/download/v5_0/full/custom'
+        }
+        feature_types = {
+            'bgt': [
+                "begroeidterreindeel", "onbegroeidterreindeel", "ondersteunendwaterdeel",
+                "ondersteunendwegdeel", "overbruggingsdeel", "spoor", "tunneldeel",
+                "waterdeel", "wegdeel"
+            ],
+            'dkk': ["kadastralegrens"]
+        }
+        formats = {
+            'bgt': 'citygml',
+            'dkk': 'gml'
+        }
 
-        url = 'https://api.pdok.nl/lv/bgt/download/v1_0/delta/custom'
+        service_type = 'bgt' if bgt else 'dkk'
+
+        url = base_urls[service_type]
         headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
         data = {
-            "featuretypes": [
-                "begroeidterreindeel",
-                "onbegroeidterreindeel",
-                "ondersteunendwaterdeel",
-                "ondersteunendwegdeel",
-                "ongeclassificeerdobject",
-                "overbruggingsdeel",
-                "overigbouwwerk",
-                "spoor",
-                "tunneldeel",
-                "vegetatieobject",
-                "waterdeel",
-                "wegdeel"
-            ],
-            "format": "citygml",
+            "featuretypes": feature_types[service_type],
+            "format": formats[service_type],
             "geofilter": poly_range
         }
-        settings = {'url': url, 'headers': headers, 'data': data}
+        return {'url': url, 'headers': headers, 'data': data}
 
-        return settings
+    def _request_data(self, settings):
+        response = requests.post(settings['url'], headers=settings['headers'], json=settings['data'])
+        try:
+            request_id = response.json().get('downloadRequestId')
+        except requests.exceptions.JSONDecodeError:
+            print("Failed to parse the response as JSON.")
+            return None
+        return f"{settings['url']}/{request_id}/status"
 
-    def settings_dkk(self, poly_range):
-        url = 'https://api.pdok.nl/kadaster/kadastralekaart/download/v4_0/full/custom'
-        headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
-        data = {
-            "featuretypes": [
-                "kadastralegrens",
-                "pand"
-            ],
-            "format": "gml",
-            "geofilter": poly_range
+    def _get_wms_image(self, lat, lon, range):
+        wms_url = "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0"
+        bbox = f"{lon - range},{lat - range},{lon + range},{lat + range}"
+        params = {
+            'service': 'WMS',
+            'request': 'GetMap',
+            'version': '1.3.0',
+            'layers': 'Actueel_orthoHR',
+            'styles': '',
+            'crs': 'EPSG:28992',
+            'bbox': bbox,
+            'width': 1000,
+            'height': 1000,
+            'format': 'image/jpeg'
         }
-        settings = {'url': url, 'headers': headers, 'data': data}
+        response = requests.get(wms_url, params=params)
+        image = Image.open(BytesIO(response.content))
+        return image
 
-        return settings
-
-    def bgt_request(self, sett_bgt):
-
-        url = sett_bgt.get('url')
-        headers = sett_bgt.get('headers')
-        data = sett_bgt.get('data')
-
-        response_filter = requests.post(url=url, headers=headers, json=data)
-        request_id = response_filter.json().get('downloadRequestId')
-        request_id_url = f'https://api.pdok.nl/lv/bgt/download/v1_0/delta/custom/{request_id}/status'
-
-        return request_id_url
-
-    def dkk_request(self, sett_dkk):
-
-        url = sett_dkk.get('url')
-        headers = sett_dkk.get('headers')
-        data = sett_dkk.get('data')
-
-        response_filter = requests.post(url, headers=headers, json=data)
-        request_id = response_filter.json().get('downloadRequestId')
-        request_id_url = f'https://api.pdok.nl/kadaster/kadastralekaart/download/v4_0/delta/custom/{request_id}/status'
-
-        return request_id_url
-
-    def unpack(self, download_get):
+    def _unpack_zip(self, content, wms_image, wms_image_zoom):
         with tempfile.TemporaryFile() as fp:
-            fp.write(download_get.content)
+            fp.write(content)
             fp.seek(0)
-
-            print(tempfile.gettempdir())
-            file_name = '/'.join([tempfile.gettempdir(), 'bgt-api-download.zip'])
-
-            with open(file_name, 'wb') as outfile:
+            zip_file_path = os.path.join(tempfile.gettempdir(), 'bgt-api-download.zip')
+            with open(zip_file_path, 'wb') as outfile:
                 outfile.write(fp.read())
-            print(self.dir_path)
 
-            # home_dir = os.path.expanduser('~')
-            # downloads_dir = os.path.join(home_dir, 'Downloads')
-
-            # extract_path = '/'.join([self.dir_path, self.address])
-            # print(extract_path)
-
-
-            with zipfile.ZipFile(file_name, "r") as zip_ref:
+            # Extract and add WMS image
+            with zipfile.ZipFile(zip_file_path, "a") as zip_ref:
                 zip_ref.extractall(self.dir_path)
+                wms_image_path = os.path.join(self.dir_path, 'wms_image.jpg')
+                wms_image.save(wms_image_path)
+                zip_ref.write(wms_image_path, 'wms_image.jpg')
 
-            self.rename_file_extension(self.dir_path, '.xml', '.gml')
+                wms_image_path_zoom = os.path.join(self.dir_path, 'wms_image_zoom.jpg')
+                wms_image_zoom.save(wms_image_path_zoom)
+                zip_ref.write(wms_image_path_zoom, 'wms_image_zoom.jpg')
 
-    def iterate(self, req_url):
+            self._rename_file_extension(self.dir_path, '.xml', '.gml')
 
+
+    def _poll_status(self, req_url):
         sleeper_amt = 10
         response_list = []
-
-        for i in range(sleeper_amt):
+        for _ in range(sleeper_amt):
             time.sleep(1)
             response = requests.get(req_url)
-            json_response = response.json()
-            response_list.append(json_response)
-
+            response_list.append(response.json())
             if response.status_code == 201:
-                download = json_response.get('_links').get('download').get('href')
-                url_request = f'https://api.pdok.nl{download}'
-                download_get = requests.get(url_request)
-
-                self.unpack(download_get)
-                print("File downloaded and saved to temp folder.")
-
-                break
+                download_url = f"https://api.pdok.nl{response.json().get('_links').get('download').get('href')}"
+                download_get = requests.get(download_url)
+                return download_get.content
 
             elif response.status_code == 200:
                 print("Download running..")
 
             else:
                 print(f"Error: {response.status_code}")
+        return None
 
-        return response_list
+    def run(self, size):
+        poly_range = self._create_polygon_range(self.rd_coord, size)
+        bgt_settings = self._prepare_request_settings(poly_range, bgt=True)
+        dkk_settings = self._prepare_request_settings(poly_range, bgt=False)
+        # print(dkk_settings)
+        bgt_req_url = self._request_data(bgt_settings)
+        dkk_req_url = self._request_data(dkk_settings)
+        # print(dkk_req_url)
+        bgt_content = self._poll_status(bgt_req_url)
+        dkk_content = self._poll_status(dkk_req_url)
 
-    def run(self, size=1000):
+        wms_image = self._get_wms_image(self.rd_coord[1], self.rd_coord[0], 500)
+        wms_image_zoom = self._get_wms_image(self.rd_coord[1], self.rd_coord[0], 50)
 
-        rd_coord = self.location_request(self.address)
-        poly_range = self.download_range(rd_coord, size)
+        try:
+            contents = {'bgt': bgt_content, 'dkk': dkk_content}
+            for key, content in contents.items():
+                if content:
+                    self._unpack_zip(content, wms_image, wms_image_zoom)
+            print("Files downloaded and saved to temp folder.")
+        except Exception as e:
+            print(f"Failed to download some files. Error: {e}")
 
-        sett_bgt = self.settings_bgt(poly_range)
-        sett_dkk = self.settings_dkk(poly_range)
 
-        req_bgt = self.bgt_request(sett_bgt)
-        req_dkk = self.dkk_request(sett_dkk)
+        # if bgt_content and dkk_content:
+        #     self._unpack_zip(bgt_content, wms_image, wms_image_zoom)
+        #     self._unpack_zip(dkk_content, wms_image, wms_image_zoom)
+        #     print("Files downloaded and saved to temp folder.")
+        # else:
+        #     print("Failed to download some files.")
 
-        resp_bgt = self.iterate(req_bgt)
-        resp_dkk = self.iterate(req_dkk)
-
-        return resp_bgt
+        return bgt_content, dkk_content
